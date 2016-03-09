@@ -100,7 +100,6 @@ class Structure(object):
             residues.extend(c.residues)
         return residues
 
-
     def to_str(self):
         pass
 
@@ -110,8 +109,13 @@ class Structure(object):
 
 class RNAStructure(object):
     def __init__(self):
-        pass
+        self.structure = Structure()
 
+    def get_residue(self, num=None, chain_id=None, i_code=None, uuid=None):
+        return self.structure.get_residue(num, chain_id, i_code, uuid)
+
+    def residues(self):
+        return self.structure.residues()
 
 class Motif(RNAStructure):
     def __init__(self, struct=None, basepairs=None, ends=None):

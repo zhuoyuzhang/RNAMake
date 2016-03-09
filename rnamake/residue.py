@@ -44,7 +44,7 @@ class Bead(object):
 
 
     def copy(self):
-        return  Bead(np.copy(self.center), self.btype)
+        return  Bead(self.center[:], self.btype)
 
 
 class ResidueState(object):

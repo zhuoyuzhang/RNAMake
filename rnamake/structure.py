@@ -176,6 +176,7 @@ class Structure(object):
             a.coords += p
 
 
+
 def structure_from_pdb(pdb_path):
     residues = pdb_parser.parse(pdb_path)
     chains = chain.connect_residues_into_chains(residues)

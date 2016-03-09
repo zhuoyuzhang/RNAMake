@@ -65,7 +65,7 @@ class MotifStateTreeUnittest(unittest.TestCase):
         bp_state = m.ends[1].state()
         test_state = rm.manager.ms_libs["ideal_helices"].get(name='HELIX.IDEAL.3')
         d1 = bp_state.d
-        #rint d1
+        #print d1
         motif.align_motif_state(bp_state, test_state)
         d2 = test_state.end_states[0].d
         if util.distance(d1, d2) > 0.5:
