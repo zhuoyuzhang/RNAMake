@@ -414,7 +414,7 @@ def align_motif_state(ref_bp_state, org_state):
         org_state.end_states[i].set(new_r,new_d,new_sug)
 
     if len(org_state.beads) > 0:
-        cur_state.beads = np.dot(org_state.beads, r.T) + t
+        org_state.beads = np.dot(org_state.beads, r.T) + t
 
 
 def get_aligned_motif_state(ref_bp_state, cur_state, org_state):

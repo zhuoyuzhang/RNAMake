@@ -2,7 +2,7 @@
 
 class Residue(object):
     def __init__(self, name, num, chain_id, i_code=""):
-        self.name = name,
+        self.name = name
         self.num = num
         self.chain_id = chain_id
         self.i_code = i_code
@@ -38,6 +38,9 @@ class Chain(object):
         self.residues = []
         if residues is not None:
             self.residues = residues
+
+    def __len__(self):
+        return len(self.residues)
 
     def copy(self):
         pass

@@ -1,9 +1,11 @@
 import primitives
 import basic_io
 import util
+import basic_io
 
 import uuid
 import numpy as np
+import residue
 import motif
 import resource_manager as rm
 
@@ -27,6 +29,9 @@ def get_motif_state(m):
         bp_state = Basepair(end.r(), end.d(), end.state().sugars, res1, res2,
                             end.name())
         ends.append(bp_state)
+
+    ends[0].res1.beads = []
+    ends[0].res2.beads = []
 
     return Motif(struc, ends, end_ids=m.end_ids, name=m.name)
 
@@ -55,13 +60,10 @@ class Residue(primitives.Residue):
         else:
             self.beads = beads
 
-    def __str__(self):
-        return self.name + "," + "," + str(self.num) + "," + \
-               str(self.chain_id) + "," + str(self.i_code) + \
-               "," + basic_io.points_to_str(self.beads)
-
     def to_str(self):
-        return str(self)
+        return str(self.name) + "," + str(self.num) + "," + \
+               str(self.chain_id) + "," + str(self.i_code) + \
+               "," + basic_io.beads_to_str(self.beads)
 
     def copy(self):
         return Residue(self.name, self.num, self.chain_id, self.i_code,
@@ -77,14 +79,11 @@ class Chain(primitives.Chain):
     def __init__(self, residues=None):
         super(self.__class__, self).__init__(residues)
 
-    def __str__(self):
+    def to_str(self):
         s = ""
         for r in self.residues:
             s += r.to_str() + ";"
         return s
-
-    def to_str(self):
-        return str(self)
 
     def copy(self):
         residues = []
@@ -201,9 +200,13 @@ class Basepair(object):
         converts basepairstate into a string
         """
 
-        s = basic_io.point_to_str(self.d) + ";" + \
+        str1 = self.res1.chain_id+str(self.res1.num)+str(self.res1.i_code)
+        str2 = self.res2.chain_id+str(self.res2.num)+str(self.res2.i_code)
+
+        s = str1 +"-"+str2 + ";" + basic_io.point_to_str(self.d) + ";" + \
             basic_io.matrix_to_str(self.r) + ";" +\
-            basic_io.matrix_to_str(self.sugars)
+            basic_io.matrix_to_str(self.sugars) + ";"
+
         return s
 
 
@@ -218,6 +221,12 @@ class Structure(primitives.Structure):
     def copy(self):
         new_chains = [ c.copy() for c in self.chains ]
         return Structure(new_chains)
+
+    def to_str(self):
+        s = ""
+        for c in self.chains:
+            s += c.to_str() + "|"
+        return s
 
 
 class Motif(primitives.RNAStructure):
@@ -244,8 +253,15 @@ class Motif(primitives.RNAStructure):
         return Motif(struc, ends, self.name, self.end_names, self.score,
                      self.block_end_add)
 
-    def beads_to_pdb(self):
-        pass
+    def beads(self):
+        beads = []
+        for r in self.residues():
+            beads.extend(r.beads)
+        return beads
+
+    def beads_to_pdb(self, filename):
+        beads = self.beads()
+        basic_io.beads_to_pdb(filename, beads)
 
     def to_motif(self):
         m = rm.manager.get_motif(name=self.name,
@@ -258,6 +274,36 @@ class Motif(primitives.RNAStructure):
     def to_pdb(self, filename):
         return self.to_motif().to_pdb(filename)
 
+    def to_str(self):
+        pass
+
+
+def str_to_residue(s):
+    spl = s.split(",")
+    beads = []
+    for i in range(4, len(spl)-1):
+        b = residue.str_to_bead(spl[i])
+        beads.append(b)
+    return Residue(spl[0], int(spl[1]), spl[2], spl[3], None, beads)
+
+
+def str_to_chain(s):
+    spl = s.split(";")
+    residues = []
+    for r_str in spl[:-1]:
+        r = str_to_residue(r_str)
+        residues.append(r)
+    return Chain(residues)
+
+
+def str_to_structure(s):
+    spl = s.split("|")
+    chains = []
+    for c_str in spl[:-1]:
+        c = str_to_chain(c_str)
+        chains.append(c)
+    return Structure(chains)
+
 
 
 def align_motif_state(ref_bp_state, org_state):
@@ -268,3 +314,23 @@ def align_motif_state(ref_bp_state, org_state):
     for i, s in enumerate(org_state.ends):
         new_r, new_d, new_sug = s.get_transformed_state(r, t)
         org_state.ends[i].set(new_r,new_d,new_sug)
+
+    for r in org_state.residues():
+        for b in r.beads:
+            b.center = np.dot(b.center, r_T) + t
+
+
+def get_aligned_motif_state(ref_bp_state, cur_state, org_state):
+    r, t = ref_bp_state.get_transforming_r_and_t_w_state(org_state.ends[0])
+    t += ref_bp_state.d
+
+    for i, s in enumerate(org_state.ends):
+        new_r, new_d, new_sug = s.get_transformed_state(r, t)
+        cur_state.ends[i].set(new_r, new_d, new_sug)
+
+    for r in cur_state.residues():
+        for b in r.beads:
+            b.center = np.dot(b.center, r_T) + t
+
+
+

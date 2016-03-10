@@ -42,9 +42,11 @@ class Bead(object):
     def __init__(self, center, btype):
         self.center, self.btype = center, btype
 
-
     def copy(self):
-        return  Bead(self.center[:], self.btype)
+        return Bead(self.center[:], self.btype)
+
+    def to_str(self):
+        return basic_io.bead_to_str(self)
 
 
 class ResidueState(object):
@@ -378,4 +380,9 @@ class Residue(object):
         f.close()
 
 
+def str_to_bead(s):
+    spl = s.split()
+    type = int(spl.pop())
+    p = np.array([float(x) for x in s.split()])
+    return Bead(p, type)
 
