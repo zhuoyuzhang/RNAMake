@@ -7,6 +7,7 @@ import rnamake.util as util
 import rnamake.cluster as cluster
 import rnamake.settings as settings
 import rnamake.sqlite_library as sqlite_library
+from rnamake import motif_state
 import math
 import subprocess
 import os
@@ -290,13 +291,13 @@ class BuildSqliteLibraries(object):
             motif_states = []
             names = []
             for i, m in enumerate(mlib.all()):
-                ms = m.get_state()
+                ms = motif_state.get_motif_state(m)
                 data.append([ms.to_str(), ms.name,
                              ms.end_names[0], ms.end_ids[0], i])
 
 
 
-            path = settings.RESOURCES_PATH + "/motif_state_libraries/" + libname + ".db"
+            path = settings.RESOURCES_PATH + "/motif_state_libraries_new/" + libname + ".db"
             sqlite_library.build_sqlite_library_2(path, data, keys, 'id')
 
     def build_unique_twoway_library(self):
@@ -445,10 +446,10 @@ class BuildSqliteLibraries(object):
 #setup_start_motif()
 builder = BuildSqliteLibraries()
 
-builder.build_ideal_helices()
-builder.build_basic_libraries()
-builder.build_helix_ensembles()
-#builder.build_ss_and_seq_libraries()
+#builder.build_ideal_helices()
+#builder.build_basic_libraries()
+#builder.build_helix_ensembles()
+builder.build_ss_and_seq_libraries()
 builder.build_unique_twoway_library()
 builder.build_motif_state_libraries()
 builder.build_motif_ensemble_state_libraries()

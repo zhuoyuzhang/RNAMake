@@ -42,6 +42,9 @@ class MotifStateTreeUnittest(unittest.TestCase):
         if len(mst) != 10:
             self.fail("did not build mst properly")
 
+        for n in mst:
+            n.data.cur_state.to_pdb("node."+str(n.index)+".pdb")
+
         #for n in mt:
         #    print n.data.name
 

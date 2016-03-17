@@ -9,6 +9,7 @@ import settings
 import basic_io
 import motif_tree_topology
 import motif_connection
+import motif_state
 from collections import namedtuple
 
 def motif_state_tree_from_topology(mtt, sterics=1):
@@ -50,6 +51,17 @@ class MotifStateTree(base.Base):
         self.constraints = {}
 
     def _setup_from_mt(self, mt):
+        for i, n in enumerate(mt.tree.nodes):
+            ms = motif_state.get_motif_state(n.data)
+            #ms_org = rm.manager.get_state(name=ms.name, end_id=ms.end_ids[0],
+            #                              end_name=ms.ends[0].name)
+            #ms_org.copy_uuids_from(ms)
+
+            n_data = NodeData(ms)
+            self.tree.add_data(n_data, len(ms.ends), n.parent_index(), n.parent_end_index())
+
+
+    def _setup_from_mt_old(self, mt):
         for i, n in enumerate(mt.tree.nodes):
             ms = rm.manager.get_state(name=n.data.name, end_id=n.data.end_ids[0],
                                       end_name=n.data.ends[0].name())
@@ -286,9 +298,12 @@ class MotifStateTree(base.Base):
         return None
 
 class NodeData(object):
-    def __init__(self, ref_state):
+    def __init__(self, ref_state, cur_state=None):
         self.ref_state = ref_state
-        self.cur_state = ref_state.copy()
+        if cur_state is None:
+            self.cur_state = ref_state.copy()
+        else:
+            self.cur_state = cur_state
 
     def get_end_state(self, name):
         return self.cur_state.get_end_state(name)

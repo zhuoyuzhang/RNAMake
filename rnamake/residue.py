@@ -383,6 +383,6 @@ class Residue(object):
 def str_to_bead(s):
     spl = s.split()
     type = int(spl.pop())
-    p = np.array([float(x) for x in s.split()])
+    p = np.array([float(x) for x in spl])
     return Bead(p, type)
 

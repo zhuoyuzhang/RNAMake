@@ -76,7 +76,7 @@ class MotifStateUnittest(unittest.TestCase):
             if dist > 0.1:
                 self.fail()
 
-    def test_to_str_residue(self):
+    def test_to_str_chain(self):
         m = rm.manager.get_motif(name="HELIX.IDEAL.2")
         ms = motif_state.get_motif_state(m)
 
@@ -84,7 +84,14 @@ class MotifStateUnittest(unittest.TestCase):
         c_str = c.to_str()
         c_new = motif_state.str_to_chain(c_str)
 
-        print len(c), len(c_new)
+    def test_to_str(self):
+        m = rm.manager.get_motif(name="HELIX.IDEAL.2")
+        ms = motif_state.get_motif_state(m)
+        s = ms.to_str()
+
+        ms_copy = motif_state.str_to_motif(s)
+        motif_state.align_motif_state(ms.ends[1], ms_copy)
+
 
 
 
