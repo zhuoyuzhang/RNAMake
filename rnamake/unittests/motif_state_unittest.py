@@ -95,6 +95,12 @@ class MotifStateUnittest(unittest.TestCase):
 
 
 
+#if __name__ == '__main__':
+#    suite = unittest.TestLoader().loadTestsFromTestCase(MotifStateUnittest)
+#    unittest.TextTestRunner(verbosity=0).run(suite)
+
+def main():
+    unittest.main()
+
 if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(MotifStateUnittest)
-    unittest.TextTestRunner(verbosity=0).run(suite)
+    main()

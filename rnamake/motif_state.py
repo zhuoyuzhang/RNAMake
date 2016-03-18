@@ -23,18 +23,26 @@ def get_motif_state(m):
         c_states.append(c_state)
     struc = Structure(c_states)
 
+    bps = []
+    for bp in m.basepairs:
+        if bp.bp_type != "cW-W":
+            continue
+        res1 = struc.get_residue(uuid=bp.res1.uuid)
+        res2 = struc.get_residue(uuid=bp.res2.uuid)
+        bp_state = Basepair(bp.r(), bp.d(), bp.state().sugars, res1, res2)
+        bp_state.uuid = bp.uuid
+        bps.append(bp_state)
+
     ends = []
     for end in m.ends:
-        res1 = struc.get_residue(uuid=end.res1.uuid)
-        res2 = struc.get_residue(uuid=end.res2.uuid)
-        bp_state = Basepair(end.r(), end.d(), end.state().sugars, res1, res2)
-        bp_state.uuid = end.uuid
-        ends.append(bp_state)
+        for bp in bps:
+            if end.uuid == bp.uuid:
+                ends.append(bp)
 
     ends[0].res1.beads = []
     ends[0].res2.beads = []
 
-    ms = Motif(struc, ends, end_ids=m.end_ids, name=m.name)
+    ms = Motif(struc, bps, ends, end_ids=m.end_ids, name=m.name)
     ms.uuid = m.id
     return ms
 
@@ -238,10 +246,17 @@ class Structure(primitives.Structure):
 
 
 class Motif(primitives.RNAStructure):
-    def __init__(self, struct=None, ends=None, name=None, end_names=None,
+    def __init__(self, struct=None, basepairs=None, ends=None, name=None, end_names=None,
                  end_ids=None, score=0, block_end_add=0):
         self.structure = struct
+        if self.structure is None:
+            self.structure = Structure()
+        self.basepairs = basepairs
+        if self.basepairs is None:
+            self.basepairs = []
         self.ends = ends
+        if self.ends is None:
+            self.ends = []
         self.name = name
         self.end_names = end_names
         self.end_ids = end_ids
@@ -253,15 +268,20 @@ class Motif(primitives.RNAStructure):
 
     def copy(self):
         struc = self.structure.copy()
+        bps = []
+        for bp in self.basepairs:
+            res1 = struc.get_residue(uuid=bp.res1.uuid)
+            res2 = struc.get_residue(uuid=bp.res2.uuid)
+            bp_end = bp.copy()
+            bp_end.res1 = res1
+            bp_end.res2 = res2
+            bps.append(bp_end)
         ends = []
         for end in self.ends:
-            res1 = struc.get_residue(uuid=end.res1.uuid)
-            res2 = struc.get_residue(uuid=end.res2.uuid)
-            new_end = end.copy()
-            new_end.res1 = res1
-            new_end.res2 = res2
+            new_end_i = self.basepairs.index(end)
+            new_end = bps[new_end_i]
             ends.append(new_end)
-        return Motif(struc, ends, self.name, self.end_names, self.end_ids,
+        return Motif(struc, bps, ends, self.name, self.end_names, self.end_ids,
                      self.score, self.block_end_add)
 
     def beads(self):
@@ -289,8 +309,11 @@ class Motif(primitives.RNAStructure):
         s = self.path + "&" + self.name + "&" + str(self.score) + "&" +  \
             str(self.block_end_add) + "&" + \
             str(self.mtype) + "&" + self.structure.to_str() + "&"
+        for bp in self.basepairs:
+            s += bp.to_str() + "@"
+        s += "&"
         for end in self.ends:
-            s += end.to_str() + "@"
+            s += self.basepairs.index(end) + " "
         s += "&"
         for end_id in self.end_ids:
             s += end_id + " "
@@ -299,8 +322,8 @@ class Motif(primitives.RNAStructure):
 
     def copy_uuids_from(self, m):
         self.uuid = m.uuid
-        for i, end in enumerate(m.ends):
-            self.ends[i].uuid = end.uuid
+        for i, bp in enumerate(m.basepairs):
+            self.basepairs[i].uuid = bp.uuid
         res = self.residues()
         for i, r in enumerate(m.residues()):
             res[i] = r.uuid
@@ -350,10 +373,9 @@ def str_to_motif(s):
     m.block_end_add = int(spl[3])
     m.mtype = int(spl[4])
     m.structure = str_to_structure(spl[5])
-    m.ends = []
-    ends_str = spl[6].split("@")
-    for end_str in ends_str[:-1]:
-        bp_spl = end_str.split(";")
+    bps_str = spl[6].split("@")
+    for bp_str in bps_str[:-1]:
+        bp_spl = bp_str.split(";")
         res_spl = bp_spl[0].split("-")
         res1_id, res1_num = res_spl[0][0], int(res_spl[0][1:])
         res2_id, res2_num = res_spl[1][0], int(res_spl[1][1:])
@@ -363,9 +385,11 @@ def str_to_motif(s):
         r = basic_io.str_to_matrix(bp_spl[2])
         sugars = basic_io.str_to_matrix(bp_spl[3])
         end = Basepair(r, d, sugars, res1, res2)
-        m.ends.append(end)
-    m.end_ids = spl[7].split()
-
+        m.bps.append(end)
+    end_indexes = spl[7].split()
+    for index in end_indexes:
+        m.ends.append(m.basepairs[int(index)])
+    m.end_ids = spl[8].split()
     return m
 
 

@@ -273,7 +273,7 @@ class MotifStateTree(base.Base):
 
     def get_residue(self, uuid):
         for n in self.tree:
-            for r in n.data.cur_state.residues:
+            for r in n.data.cur_state.residues():
                 if r.uuid == uuid:
                     return r
         return None

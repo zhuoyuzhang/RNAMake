@@ -8,6 +8,7 @@ import rnamake.util as util
 import rnamake.settings as settings
 import rnamake.basic_io as basic_io
 import rnamake.eternabot.sequence_designer as sequence_designer
+from rnamake import motif_state
 import build
 
 class MotifStateTreeUnittest(unittest.TestCase):
@@ -69,8 +70,8 @@ class MotifStateTreeUnittest(unittest.TestCase):
         test_state = rm.manager.ms_libs["ideal_helices"].get(name='HELIX.IDEAL.3')
         d1 = bp_state.d
         #print d1
-        motif.align_motif_state(bp_state, test_state)
-        d2 = test_state.end_states[0].d
+        motif_state.align_motif_state(bp_state, test_state)
+        d2 = test_state.ends[0].d
         if util.distance(d1, d2) > 0.5:
             self.fail("did not align motif state properly")
 
