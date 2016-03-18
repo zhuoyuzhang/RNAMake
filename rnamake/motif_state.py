@@ -313,7 +313,7 @@ class Motif(primitives.RNAStructure):
             s += bp.to_str() + "@"
         s += "&"
         for end in self.ends:
-            s += self.basepairs.index(end) + " "
+            s += str(self.basepairs.index(end)) + " "
         s += "&"
         for end_id in self.end_ids:
             s += end_id + " "
@@ -385,7 +385,7 @@ def str_to_motif(s):
         r = basic_io.str_to_matrix(bp_spl[2])
         sugars = basic_io.str_to_matrix(bp_spl[3])
         end = Basepair(r, d, sugars, res1, res2)
-        m.bps.append(end)
+        m.basepairs.append(end)
     end_indexes = spl[7].split()
     for index in end_indexes:
         m.ends.append(m.basepairs[int(index)])
