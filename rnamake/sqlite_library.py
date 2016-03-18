@@ -3,6 +3,7 @@ import random
 import os
 import settings
 import motif
+import motif_state
 import motif_ensemble
 import secondary_structure_factory
 import secondary_structure
@@ -262,19 +263,19 @@ class MotifStateSqliteLibrary(SqliteLibrary):
     @staticmethod
     def get_libnames():
         libnames = {
-            "ideal_helices" :  "/motif_state_libraries/ideal_helices.db",
-            "twoway"        :  "/motif_state_libraries/twoway.db",
-            "unique_twoway" :  "/motif_state_libraries/unique_twoway.db",
-            "bp_steps"      :  "/motif_state_libraries/bp_steps.db",
-            "twoway"        :  "/motif_state_libraries/twoway.db",
-            "nway"          :  "/motif_state_libraries/nway.db",
+            "ideal_helices" :  "/motif_state_libraries_new/ideal_helices.db",
+            "twoway"        :  "/motif_state_libraries_new/twoway.db",
+            "unique_twoway" :  "/motif_state_libraries_new/unique_twoway.db",
+            "bp_steps"      :  "/motif_state_libraries_new/bp_steps.db",
+            "twoway"        :  "/motif_state_libraries_new/twoway.db",
+            "nway"          :  "/motif_state_libraries_new/nway.db",
 
         }
 
         return libnames
 
     def _generate_data(self, s):
-        return motif.str_to_motif_state(s)
+        return motif_state.str_to_motif(s)
 
     def to_motif_state_ensemble(self):
         self.load_all()

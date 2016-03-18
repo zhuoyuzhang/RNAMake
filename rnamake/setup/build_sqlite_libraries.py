@@ -293,7 +293,7 @@ class BuildSqliteLibraries(object):
             for i, m in enumerate(mlib.all()):
                 ms = motif_state.get_motif_state(m)
                 data.append([ms.to_str(), ms.name,
-                             ms.end_names[0], ms.end_ids[0], i])
+                             ms.ends[0].name, ms.end_ids[0], i])
 
 
 

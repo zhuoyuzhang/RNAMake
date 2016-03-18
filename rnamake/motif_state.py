@@ -34,9 +34,9 @@ def get_motif_state(m):
     ends[0].res1.beads = []
     ends[0].res2.beads = []
 
-    m = Motif(struc, ends, end_ids=m.end_ids, name=m.name)
-    m.uuid = m.id
-    return m
+    ms = Motif(struc, ends, end_ids=m.end_ids, name=m.name)
+    ms.uuid = m.id
+    return ms
 
 
 class Residue(primitives.Residue):
@@ -299,11 +299,20 @@ class Motif(primitives.RNAStructure):
 
     def copy_uuids_from(self, m):
         self.uuid = m.uuid
-        for i, end in m.ends:
+        for i, end in enumerate(m.ends):
             self.ends[i].uuid = end.uuid
         res = self.residues()
-        for i, r in m.residues():
+        for i, r in enumerate(m.residues()):
             res[i] = r.uuid
+
+    def get_end_state(self, name):
+        for i, end in enumerate(self.ends):
+            if i == self.block_end_add:
+                continue
+            if end.name == name:
+                return end
+        raise ValueError("cannot get end state of name: " + name)
+
 
 def str_to_residue(s):
     spl = s.split(",")
@@ -367,17 +376,17 @@ def align_motif_state(ref_bp_state, org_state):
 
     for i, s in enumerate(org_state.ends):
         new_r, new_d, new_sug = s.get_transformed_state(r, t)
-        org_state.ends[i].set(new_r,new_d,new_sug)
+        org_state.ends[i].set(new_r, new_d, new_sug)
 
     for r in org_state.residues():
         for b in r.beads:
-            #print b.center
             b.center = np.dot(b.center, r_T) + t
 
 
 def get_aligned_motif_state(ref_bp_state, cur_state, org_state):
     r, t = ref_bp_state.get_transforming_r_and_t_w_state(org_state.ends[0])
     t += ref_bp_state.d
+    r_T = r.T
 
     for i, s in enumerate(org_state.ends):
         new_r, new_d, new_sug = s.get_transformed_state(r, t)

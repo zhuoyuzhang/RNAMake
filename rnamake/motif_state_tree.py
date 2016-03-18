@@ -53,29 +53,12 @@ class MotifStateTree(base.Base):
     def _setup_from_mt(self, mt):
         for i, n in enumerate(mt.tree.nodes):
             ms = motif_state.get_motif_state(n.data)
-            #ms_org = rm.manager.get_state(name=ms.name, end_id=ms.end_ids[0],
-            #                              end_name=ms.ends[0].name)
-            #ms_org.copy_uuids_from(ms)
+            ms_org = rm.manager.get_state(name=ms.name, end_id=ms.end_ids[0],
+                                          end_name=ms.ends[0].name)
+            ms_org.copy_uuids_from(ms)
 
-            n_data = NodeData(ms)
+            n_data = NodeData(ms_org, ms)
             self.tree.add_data(n_data, len(ms.ends), n.parent_index(), n.parent_end_index())
-
-
-    def _setup_from_mt_old(self, mt):
-        for i, n in enumerate(mt.tree.nodes):
-            ms = rm.manager.get_state(name=n.data.name, end_id=n.data.end_ids[0],
-                                      end_name=n.data.ends[0].name())
-            ms.update_res_uuids(n.data.residues())
-
-            if i == 0:
-                self.add_state(ms)
-            else:
-                parent_index = n.parent_index()
-                parent_end_index = n.parent_end_index()
-
-                j = self.add_state(ms, parent_index, parent_end_index)
-                if j == -1:
-                    raise ValueError("could not convert motif tree to motif state tree")
 
         for c in mt.connections:
             self.connections.append(c.copy())
@@ -88,11 +71,11 @@ class MotifStateTree(base.Base):
 
         if parent is None:
             n_data = NodeData(state)
-            return self.tree.add_data(n_data, len(state.end_states), -1, -1)
+            return self.tree.add_data(n_data, len(state.ends), -1, -1)
 
         if parent_end_name is not None:
             parent_end = parent.data.cur_state.get_end_state(parent_end_name)
-            parent_end_index = parent.data.cur_state.end_states.index(parent_end)
+            parent_end_index = parent.data.cur_state.ends.index(parent_end)
 
         avail_pos = self.tree.get_available_pos(parent, parent_end_index)
 
@@ -101,9 +84,9 @@ class MotifStateTree(base.Base):
                 continue
 
             n_data = NodeData(state)
-            motif.get_aligned_motif_state(parent.data.cur_state.end_states[p],
-                                          n_data.cur_state,
-                                          n_data.ref_state)
+            motif_state.get_aligned_motif_state(parent.data.cur_state.ends[p],
+                                                n_data.cur_state,
+                                                n_data.ref_state)
 
             if self.option('sterics') and self._steric_clash(n_data):
                 continue
@@ -112,7 +95,7 @@ class MotifStateTree(base.Base):
 
         return -1
 
-    def add_mst(self, mst,  parent_index=-1, parent_end_index=-1,
+    def add_motif_state_tree(self, mst,  parent_index=-1, parent_end_index=-1,
                   parent_end_name=None):
         index_dict = {}
         for i, n in enumerate(mst):
@@ -159,8 +142,6 @@ class MotifStateTree(base.Base):
         if len(node_i_indexes) == 0 or len(node_j_indexes) == 0:
             raise ValueError("cannot connect nodes " + str(i) + " " + str(j) +
                              " one node has no available ends")
-
-        #self.graph.connect(i, j, node_i_indexes[0], node_j_indexes[0])
 
         self.connections.append(motif_connection.MotifConnection(i, j, name_i, name_j))
 
