@@ -44,6 +44,7 @@ def get_motif_state(m):
 
     ms = Motif(struc, bps, ends, end_ids=m.end_ids, name=m.name)
     ms.uuid = m.id
+    ms.mtype = m.mtype
     return ms
 
 
@@ -79,6 +80,12 @@ class Residue(primitives.Residue):
     def copy(self):
         return Residue(self.name, self.num, self.chain_id, self.i_code,
                        self.uuid, [b.copy() for b in self.beads])
+
+    def new_uuid(self):
+        """
+        give residue a new uuid code, do this with caution
+        """
+        self.uuid = uuid.uuid1()
 
 
 class Chain(primitives.Chain):
@@ -133,6 +140,7 @@ class Basepair(object):
         self.r, self.d, self.sugars = r, d, sugars
         self.res1, self.res2 = res1, res2
         self.name = self._get_name()
+        self.uuid = uuid.uuid1()
 
     def _get_name(self):
         str1 = self.res1.chain_id+str(self.res1.num)+str(self.res1.i_code)
@@ -225,6 +233,15 @@ class Basepair(object):
 
         return s
 
+    def residues(self):
+        return [self.res1, self.res2]
+
+    def new_uuid(self):
+        """
+        give basepair a new uuid code, do this with caution
+        """
+        self.uuid = uuid.uuid1()
+
 
 class Structure(primitives.Structure):
     __slots__ = [
@@ -243,6 +260,28 @@ class Structure(primitives.Structure):
         for c in self.chains:
             s += c.to_str() + "|"
         return s
+
+
+class RNAStructure(primitives.RNAStructure):
+    def __init__(self, struct=None, basepairs=None, ends=None, name=None, end_names=None,
+                 end_ids=None, score=0, block_end_add=0):
+        self.structure = struct
+        if self.structure is None:
+            self.structure = Structure()
+        self.basepairs = basepairs
+        if self.basepairs is None:
+            self.basepairs = []
+        self.ends = ends
+        if self.ends is None:
+            self.ends = []
+        self.name = name
+        self.end_names = end_names
+        self.end_ids = end_ids
+        self.score = score
+        self.block_end_add = 0
+        self.mtype = motif_type.UNKNOWN
+        self.path = ""
+        self.uuid = uuid.uuid1()
 
 
 class Motif(primitives.RNAStructure):
@@ -281,8 +320,11 @@ class Motif(primitives.RNAStructure):
             new_end_i = self.basepairs.index(end)
             new_end = bps[new_end_i]
             ends.append(new_end)
-        return Motif(struc, bps, ends, self.name, self.end_names, self.end_ids,
+        m = Motif(struc, bps, ends, self.name, self.end_names, self.end_ids,
                      self.score, self.block_end_add)
+        m.mtype = self.mtype
+        m.uuid = self.uuid
+        return m
 
     def beads(self):
         beads = []
@@ -335,6 +377,13 @@ class Motif(primitives.RNAStructure):
             if end.name == name:
                 return end
         raise ValueError("cannot get end state of name: " + name)
+
+    def new_res_uuids(self):
+        self.id = uuid.uuid1()
+        for i, r in enumerate(self.residues()):
+            r.new_uuid()
+        for bp in self.basepairs:
+            bp.new_uuid()
 
 
 def str_to_residue(s):

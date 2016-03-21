@@ -42,6 +42,15 @@ class Chain(object):
     def __len__(self):
         return len(self.residues)
 
+    def subchain(self, start, end=None):
+        if start < 0:
+            raise ValueError("start cannot be less then 0")
+
+        if end is None:
+            end = len(self.residues)
+
+        return Chain(self.residues[start:end])
+
     def copy(self):
         pass
 
@@ -54,6 +63,11 @@ class Chain(object):
     def to_str(self):
         pass
 
+    def sequence(self):
+        seq = ""
+        for r in self.residues:
+            seq += r.name
+        return seq
 
 class Structure(object):
     def __init__(self, chains=None):
@@ -109,6 +123,10 @@ class Structure(object):
     def copy(self):
         pass
 
+    def sequence(self):
+        sequences = [x.sequence() for x in self.chains]
+        return "&".join(sequences)
+
 
 class RNAStructure(object):
     def __init__(self):
@@ -119,6 +137,12 @@ class RNAStructure(object):
 
     def residues(self):
         return self.structure.residues()
+
+    def chains(self):
+        return self.structure.chains
+
+    def sequence(self):
+        return self.structure.sequence()
 
 class Motif(RNAStructure):
     def __init__(self, struct=None, basepairs=None, ends=None):

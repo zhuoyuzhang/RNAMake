@@ -25,7 +25,6 @@ class ChainNodeData(object):
 
 class MotifMerger(object):
     def __init__(self):
-        #super(self.__class__, self).__init__()
         self.all_bps = {}
         self.motifs = {}
         self.res_overrides = {}
@@ -171,7 +170,6 @@ class MotifMerger(object):
             n.data.c = new_m.chains()[count]
             count += 1
         self.rebuild_structure = 1
-
 
     def secondary_structure(self):
         ss = ssf.factory.secondary_structure_from_motif(self.get_structure())

@@ -78,6 +78,7 @@ class MotifStateTree(base.Base):
             parent_end_index = parent.data.cur_state.ends.index(parent_end)
 
         avail_pos = self.tree.get_available_pos(parent, parent_end_index)
+        state.new_res_uuids()
 
         for p in avail_pos:
             if p == parent.data.ref_state.block_end_add:
@@ -91,7 +92,8 @@ class MotifStateTree(base.Base):
             if self.option('sterics') and self._steric_clash(n_data):
                 continue
 
-            return self.tree.add_data(n_data, len(state.end_states), parent.index, p)
+
+            return self.tree.add_data(n_data, len(state.ends), parent.index, p)
 
         return -1
 
@@ -221,11 +223,13 @@ class MotifStateTree(base.Base):
 
     def _steric_clash(self, new_data):
         for n in self.tree.nodes[::-1]:
-            for b1 in n.data.cur_state.beads:
-                for b2 in new_data.cur_state.beads:
-                    dist = util.distance(b1, b2)
-                    if dist < self.clash_radius:
-                        return 1
+            for r1 in n.data.cur_state.residues():
+                for r2 in new_data.cur_state.residues():
+                    for b1 in r1.beads:
+                        for b2 in r2.beads:
+                            dist = util.distance(b1.center, b2.center)
+                            if dist < self.clash_radius:
+                                return 1
         return 0
 
     def last_node(self):
