@@ -32,6 +32,13 @@ class Basepair(object):
         else:
             return str2+"-"+str1
 
+    def partner(self, res):
+        if res == self.res1:
+            return self.res2
+        elif res == self.res2:
+            return self.res1
+        else:
+            raise ValueError("residue not in basepair")
 
 class Chain(object):
     def __init__(self, residues=None):
@@ -134,6 +141,51 @@ class RNAStructure(object):
 
     def get_residue(self, num=None, chain_id=None, i_code=None, uuid=None):
         return self.structure.get_residue(num, chain_id, i_code, uuid)
+
+    def get_basepair(self, bp_uuid=None, res1=None, res2=None, uuid1=None,
+                     uuid2=None, name=None):
+        """
+        locates a Basepair object based on residue objects or uuids if nothing
+        is supplied you will get back all the basepairs in the motif. The way
+        to make sure you will only get one basepair back is to supply BOTH
+        res1 and res2 OR uuid1 and uuid2, I have left it open like this
+        because it is sometimes useful to get all basepairs that a single
+        residue is involved
+
+        :param res1: First residue
+        :param res2: Second residue
+        :param uuid1: First residue uuid
+        :param uuid2: Second residue uuid
+
+        :type res1: Residue object
+        :type res2: Residue object
+        :type uuid1: uuid object
+        :type uuid2: uuid object
+        """
+        alt_name = None
+        if name:
+            name_spl = name.split("-")
+            alt_name = name_spl[1] + "-" + name_spl[0]
+
+        found = []
+        for bp in self.basepairs:
+            if bp_uuid is not None and bp_uuid != bp.uuid:
+                continue
+            if res1 is not None and (res1 != bp.res1 and res1 != bp.res2):
+                continue
+            if res2 is not None and (res2 != bp.res1 and res2 != bp.res2):
+                continue
+            if uuid1 is not None and \
+               (uuid1 != bp.res1.uuid and uuid1 != bp.res2.uuid):
+                continue
+            if uuid2 is not None and \
+               (uuid2 != bp.res1.uuid and uuid2 != bp.res2.uuid):
+                continue
+            if name is not None and \
+               (name != bp.name() and alt_name != bp.name()):
+                continue
+            found.append(bp)
+        return found
 
     def residues(self):
         return self.structure.residues()

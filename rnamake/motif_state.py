@@ -242,6 +242,13 @@ class Basepair(object):
         """
         self.uuid = uuid.uuid1()
 
+    def partner(self, res):
+        if res == self.res1:
+            return self.res2
+        elif res == self.res2:
+            return self.res1
+        else:
+            raise ValueError("residue not in basepair")
 
 class Structure(primitives.Structure):
     __slots__ = [
