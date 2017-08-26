@@ -32,7 +32,7 @@ class SE3Map(object):
 
     def __mul__(self, other):
         """
-        operator reload for convolution
+        operator overload for convolution
         :param other: right operand
         :type other: SE3Map
         :return:
@@ -186,6 +186,12 @@ class SE3Map(object):
                     res += np.sum(self.data[:,:,:,al,be,ga]*self.voxel([0,0,0,al,be,ga]))
         return res
         pass
+
+    def nmlz_fast(self, data):
+        assert data.shape == self.data.shape  # shape of maps should be consistent
+        return np.sum(
+            data * self.bwt[np.newaxis, np.newaxis, np.newaxis, np.newaxis, :, np.newaxis]) * self.grid_unit ** 3
+
 
 
 class MotifGaussianList(object): # finished
