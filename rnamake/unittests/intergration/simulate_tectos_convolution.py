@@ -71,7 +71,7 @@ class MotifStateEnsembleConvolution:
                 slidetotal = np.zeros(3)
                 for sld in self.slidetrack:
                     slidetotal += sld
-                np.savez('run4',lastdata=lastdata,slidetotal=slidetotal)
+                np.savez('run7', lastdata=lastdata, slidetotal=slidetotal)
                 print 'self.done should be updated!!!'
                 break
     def get_prob(self,mtx):
@@ -254,14 +254,15 @@ class MotifStateEnsembleConvolution:
         x1, x2, x3, al, be, ga = self.map.matrix_to_grid_ndx(m)
         print 'requested array index:', x1, x2, x3, al, be, ga
         netp = 0
-        # for x1p in np.arange(max(x1-3,0),min(x1+3+1,self.grid_size[0])):
-        #     for x2p in np.arange(max(x2-3,0),min(x2+3+1,self.grid_size[0])):
-        #         for x3p in np.arange(max(x3 - 3, 0), min(x3 + 3 + 1, self.grid_size[0])):
-        for alp in np.arange(self.grid_size[1]):
-            for bep in np.arange(max(be-2,0),min(be+2,self.grid_size[2])):
-                for gap in np.arange(al+ga-alp-1,al+ga-alp+1+1):
-                    netp += self.map.data[x1,x2,x3,alp,bep,gap]*self.map.voxel([x1,x2,x3,alp,bep,gap])
-                    # netp += self.map.data[x1p,x2p,x3p,alp,bep,gap]*self.map.voxel([x1p,x2p,x3p,alp,bep,gap])
+        for x1p in np.arange(max(x1 - 1, 0), min(x1 + 1 + 1, self.grid_size[0])):
+            for x2p in np.arange(max(x2 - 1, 0), min(x2 + 1 + 1, self.grid_size[0])):
+                for x3p in np.arange(max(x3 - 1, 0), min(x3 + 1 + 1, self.grid_size[0])):
+                    for alp in np.arange(self.grid_size[1]):
+                        for bep in np.arange(max(be - 2, 0), min(be + 2, self.grid_size[2])):
+                            for gap in np.arange(al + ga - alp - 1, al + ga - alp + 1 + 1):
+                                # netp += self.map.data[x1,x2,x3,alp,bep,gap]*self.map.voxel([x1,x2,x3,alp,bep,gap])
+                                netp += self.map.data[x1p, x2p, x3p, alp, bep, gap] * self.map.voxel(
+                                    [x1p, x2p, x3p, alp, bep, gap])
         # netp += self.map.data[x1, x2, x3, al, be, ga] * self.map.voxel([x1, x2, x3, al, be, ga])
                     # netp += self.map.data[x1p, x2p, x3p, al, be, ga] * self.map.voxel([x1p, x2p, x3p, al, be, ga])
         print 'normalization factor:',self.map.nmlz()
@@ -296,8 +297,8 @@ class SimulateTectos(base.Base):
     def setup_options_and_constraints(self):
         options = { 'fseq'   : 'CTAGGAATCTGGAAGTACCGAGGAAACTCGGTACTTCCTGTGTCCTAG',
                     'fss'    : '((((((....((((((((((((....))))))))))))....))))))',
-                    # 'cseq'   : 'CTAGGATATGGUUUAUAGGCGGGAACGCCUAUAAACCTAAGTCCTAG', #highest
-                    'cseq'   : 'CTAGGATATGGGGGGUUUUUGGGAACAAAAACCCCCCTAAGTCCTAG', #lowest
+                    'cseq': 'CTAGGATATGGUUUAUAGGCGGGAACGCCUAUAAACCTAAGTCCTAG',  # highest
+                    # 'cseq'   : 'CTAGGATATGGGGGGUUUUUGGGAACAAAAACCCCCCTAAGTCCTAG', #lowest
                     'css'    : '(((((((..((((((((((((....))))))))))))...)))))))'}
         self.options = option.Options(options)
 
@@ -387,10 +388,10 @@ class SimulateTectos(base.Base):
         ni2 = self.mst.last_node().index
         # ni2 = 3
         if analyse == 0:
-            msec = MotifStateEnsembleConvolution(self.mset,ni1,ni2,grid_size=[9,9,10,9],grid_unit=1.5)
+            msec = MotifStateEnsembleConvolution(self.mset, ni1, ni2, grid_size=[9, 9, 10, 9], grid_unit=2.0)
             msec.run()
         else:
-            npzf = np.load('run2.npz')
+            npzf = np.load('run6.npz')
             msec = MotifStateEnsembleConvolution(self.mset,ni1,ni2,grid_size=[9,9,10,9],grid_unit=2.0)
             msec.map.data = npzf['lastdata']
             msec.slidetrack = [npzf['slidetotal']]

@@ -82,6 +82,7 @@ class SimulateTectos(base.Base):
         return motifs
 
     def _get_mset(self):
+
         fseq = self._remove_Us(self.option('fseq'))
         fss  = self.option('fss')
 
@@ -112,46 +113,73 @@ class SimulateTectos(base.Base):
         return mset
 
     def run(self):
-        # self.mset = self._get_mset()
         self.mst = self.mset.to_mst()
-
+        # this is only valid for tectoRNAs, of which the first index is 2, and the last index is the motif to be
+        # aligned to the first tetraloop. The first tetraloop has the index 1, and the last motif should be aligned
+        # to the end[1] of it.
         ni1 = 2
+        # first index
         ni2 = self.mst.last_node().index
-        # ni2 = 10
+        # last index
+
         # default ei = 1
         mgl = se3.MotifGaussianList(self.mset)
+        # construct a MotifGaussianList from the mset
         mg = mgl.get_mg(ni1,ni2)
+        # get the resultant MotifGaussian from ni1 to ni2
         state_node = self.mst.get_node(ni1).data
         mg.mean = np.dot(se3.state_to_matrix(
             state_node.get_end_state(state_node.end_name(0))
         ),mg.mean)
+        # align the former MotifGaussian to the state of the starting basepair in the MotifTree, so that all the
+        # coordinates are w.r.t. the origin of the MotifTree, expected to be the end[0] of the motif[0]
         state_node =self.mst.get_node(1).data
         target_matrix = se3.state_to_matrix(state_node.get_end_state(state_node.end_name(1)))
+        # get the state matrix of the basepair for the last motif to be aligned to, namely the 'target'
 
         # '''printing out the topology'''
         # print self.mst.to_pretty_str()
         '''matrix for double gaussian'''
+        # below is the parameters used to construct the window Gaussian.
+
+        # This is a set of parameters that work decently and are simple to understand
         # cutoff = 4.7
         # radius = 10.0
         # radian = cutoff/radius
         # ele_v = 2.0/radian**2
         # ele_x = 2.0/cutoff**2
         # TAU = np.diag([ele_v*2,ele_v,ele_v/5,ele_x,ele_x,ele_x])
-        cutoff = 5
+
+        # This is fine-tuned set of parameters
+        cutoff = 4.5
+        # The cutoff radius in Angstrom
         radius = 10.0
+        # The radius of the basepair, in Angstrom
         radian = cutoff/radius
         ele_v = 2.0/radian**2
-        ele_x = 2.0/cutoff**2
-        TAU = np.diag([ele_v*2,ele_v,ele_v,ele_x,ele_x,ele_x])
-        print 'TAU diag'
-        print [ele_v*2,ele_v,ele_v,ele_x,ele_x,ele_x]
+        # The elements of the TAU matrix is calculated based on that the 'cutoff' of a Gaussian is defined
+        # by its decaying to e^(-1) to the peak.
+        cutoffv = np.array([4.5, 4.5, 4.0])
+        # the cutoff radius specified in each direction
+        ele_xv = 2.0 / cutoffv ** 2
+
+        TAU = np.diag([ele_v, ele_v, ele_v, ele_xv[0], ele_xv[1], ele_xv[2]])
+
         '''testing chi'''
         from scipy import linalg as la
-        target_chi = se3.matrix_to_chi(np.dot(la.inv(mg.mean),target_matrix))
+        target_chi = se3.matrix_to_chi(np.dot(la.inv(mg.mean), target_matrix)) + \
+                     np.array([0.0, 0.0, 0.0, 0 * np.sqrt(2.0 / TAU[3, 3]), 0.0, 2.0 * np.sqrt(2.0 / TAU[5, 5])])
+        # we may slightly adjust that target_chi, which is natrual, since we may add an exponential factor before the
+        # Gaussian, representing the repulsion of the other parts of the RNA, and the result would always be a Gaussian
+        # with shifted mean.
         print target_chi
+        print 'node1 end2 chi', se3.matrix_to_chi(
+            np.dot(la.inv(mg.mean), se3.state_to_matrix(self.mst.get_node(1).data.cur_state.end_states[2])))
         print 'PDF at target: ',mg.eval(target_chi)
         res = mg.eval_double(target_chi,TAU)
         print 'P by double Gaussian: ',res
+
+        '''Below is only used for all kinds of debugging, and plotting'''
         #
         # test_chi = target_chi
         # # test_chi = np.array([0,0,0,0,0,0])
@@ -342,6 +370,7 @@ class RunMeVarLen():
         flen = 10+(len(str(fss))-len("CUAGGAAUCUGGAAGUACCGAGGAAACUCGGUACUUCCUGUGUCCUAG"))/2
         clen = 10+(len(str(css))-len("CTAGGATATGGAAGATCCTCGGGAACGAGGATCTTCCTAAGTCCTAG"))/2
         if flen != query_flen or clen != query_clen:
+            self.fin = 0
             return
         # else:
         #     self.cmpdata[0, self.k1], self.cmpdata[1, self.k1], self.cmpdata[2, self.k1] = i-1,i,i+1
@@ -369,6 +398,7 @@ class RunMeVarLen():
         simuldg = simulddg + self.wtdg
         self.cmpdata[0, self.k1], self.cmpdata[1, self.k1], self.cmpdata[2, self.k1] = simuldg, dg, dgjoe
         self.k1 += 1
+        self.fin = 1
 
 
 
@@ -377,46 +407,54 @@ class RunMeVarLen():
 if __name__ == "__main__":
     # args = parse_args()
     # opts = vars(args)
-    runme =  RunMe()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    # lenlist = [(10,11)]
+    runme = RunMeVarLen()
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # lenlist = [(10,11),(9,10)]
     lenlist = [(10,9),(10,10),(10,11),(11,9),(11,10),(9,9),(9,10)]
     # colorlist = cm.rainbow(np.mgrid[0:1:2*len(lenlist)*1j])
+    colorlist = cm.rainbow(np.mgrid[0:1:len(lenlist) * 1j])
     sctlist_mine = []
     sctlist_joe =[]
     len_split = []
     # for ndx_len in enumerate(lenlist):
+    fig1, ax1 = plt.subplots()
+    fig2, ax2 = plt.subplots()
 
-    # for i,ndx_len in enumerate(lenlist):
-    #     len_split.append(runme.k1)
-    #     k2 = runme.k1
-        # runme.cmpdata[:]=np.nan
-        # for x in range(runme.n):
-        #     runme.ud(x,*ndx_len)
-        # sct_mine= plt.scatter(runme.cmpdata[1, k2:], runme.cmpdata[0, k2:],color=colorlist[i])
+    for i, ndx_len in enumerate(lenlist):
+        len_split.append(runme.k1)
+        k2 = runme.k1
+        runme.cmpdata[:] = np.nan
+        for x in range(runme.n):
+            runme.ud(x, *ndx_len)
+            if runme.fin == 1:
+                break
+        sct_mine = ax1.scatter(runme.cmpdata[1, k2:], runme.cmpdata[0, k2:], color=colorlist[i])
         # sct_joe=plt.scatter(runme.cmpdata[1, k2:], runme.cmpdata[2, k2:], marker='^',color=colorlist[i+len(lenlist)])
-        # sctlist_mine.append(sct_mine)
-        # sctlist_joe.append(sct_joe)
+        sct_joe = ax2.scatter(runme.cmpdata[1, k2:], runme.cmpdata[2, k2:], marker='^', color=colorlist[i])
+        sctlist_mine.append(sct_mine)
+        sctlist_joe.append(sct_joe)
     # for x in range(runme.n):
     #     runme.ud(x)
-    npzf = np.load('gaussian_1010.npz')
-    runme.cmpdata = npzf['data']
-    sct_mine= plt.scatter(runme.cmpdata[1, :], runme.cmpdata[0, :])
-    plt.plot(np.mgrid[-11:-10:100j], np.mgrid[-11:-10:100j], 'k')
-    plt.figure()
-    sct_joe=plt.scatter(runme.cmpdata[1, :], runme.cmpdata[2, :], marker='^')
+    # npzf = np.load('gaussian_1010.npz')
+    # runme.cmpdata = npzf['data']
+    # sct_mine= plt.scatter(runme.cmpdata[1, :], runme.cmpdata[0, :])
+    ax1.plot(np.mgrid[-11:-7:100j], np.mgrid[-11:-7:100j], 'k')
+    # plt.figure()
+    # sct_joe=plt.scatter(runme.cmpdata[1, :], runme.cmpdata[2, :], marker='^')
     # np.savez('gaussian_1010',data=runme.cmpdata)
-    # legend1 =plt.legend(tuple(sctlist_joe),('flow %d chip %d' % x for x in lenlist),loc='lower right',
-    #                     scatterpoints=1,title='MC')
-    # legend2=plt.legend(tuple(sctlist_mine), ('flow %d chip %d' % x for x in lenlist), scatterpoints=1,
-    #            loc='upper left',title='Gaussian')
-    # legend1.draggable()
-    # legend2.draggable()
+    legend1 = ax2.legend(tuple(sctlist_joe), ('flow %d chip %d' % x for x in lenlist), loc='lower right',
+                         scatterpoints=1, title='MC')
+    legend2 = ax1.legend(tuple(sctlist_mine), ('flow %d chip %d' % x for x in lenlist), scatterpoints=1,
+                         loc='upper left', title='Gaussian')
+    legend1.draggable()
+    legend2.draggable()
     # plt.gca().add_artist(legend1)
-    plt.plot(np.mgrid[-11:-10:100j],np.mgrid[-11:-10:100j],'k')
-    ax.set_xlabel('Exp $\Delta G$(kcal/mol)')
-    ax.set_ylabel('Predicted $\Delta G$(kcal/mol)')
+    ax2.plot(np.mgrid[-11:-7:100j], np.mgrid[-11:-7:100j], 'k')
+    ax1.set_xlabel('Exp $\Delta G$(kcal/mol)')
+    ax2.set_xlabel('Exp $\Delta G$(kcal/mol)')
+    ax1.set_ylabel('Predicted $\Delta G$(kcal/mol)')
+    ax2.set_ylabel('Predicted $\Delta G$(kcal/mol)')
     plt.show()
 
 

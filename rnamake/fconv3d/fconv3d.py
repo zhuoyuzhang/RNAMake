@@ -1,5 +1,7 @@
 # coding=UTF-8
-"""Main routines for convolution"""
+"""
+Main routines for convolution
+"""
 
 import pdb
 
@@ -18,17 +20,69 @@ import numexpr as ne
 
 
 def c3d(phi1, phi2):  # phi1(x1,x2,x3,alpha,beta,gamma):
+    """
+    This is the wrapper routine to perform the SE(3) convolution by convolution theorem.
+    Operands should be in numpy.ndarray of ndim 6, with each axis meaning (x,y,z,alpha,beta,gamma),
+    and the value is the value at that point. alpha, beta, gamma are Z-X-Z Euler angles w.r.t. static
+    (or extrinsic) frame, i.e. a rotation matrix in 3D space, R, which acts on a column vector by left-
+    multiplying it, is decomposed into three plane rotation matrices along z, x and z axis, like R=Rz(alpha)
+    Rx(beta)Rz(gamma). Note Rz(gamma) is the first matrix that acts on a vector.
+    phi1, phi2 should have same shape.
+    In this routine, x1,x2,x3 should be sampled in odd nubmer of points, and the origin is at the center of it.
+    Alpha and Gamma should be sampled in equal and odd numbers of points, and the n'th point (0<=n<N) is at the angle
+    2*pi*n/N.
+    Beta should be sampled in even number of points, and the n'th point (0<=n<N) is at the angle pi*(n+1/2)/N.
+    All the three rules of gridding can be tweaked as you like, by altering the programs below.
+    Henceforth, a variable of form rang_* means the number of samples along that axis, e.g. rang_phi the number of
+    samples of angle phi. Sometimes they are contained in the auxi.py file for global use, and sometimes they are
+    abbreviated like rang_be meaning rang_beta, but they are all the same number.
+    :param phi1: the left operand for convolution
+    :param phi2: the right operand for convolution
+    :type phi1: numpy.ndarray
+    :type phi2: numpy.ndarray
+    :return: the result function, with same shape as phi1,phi2.
+    :rtype: numpy.ndarray
+    """
 
+    """
+    First of all, a plain FFT is performed, but because of all the shift a FFT is needed, it is wrapped in subroutines.
+    """
     f11 = e_fft3(phi1)
     del phi1
     f12 = e_fft3(phi2)  # f1(p1,p2,p3,alpha,beta,gamma)
     del phi2
+    """
+    The returned function, f11 and f12, should have their 6 axes corresponding to px,py,pz,alpha,beta,gamma, while the 
+    0th frequency has been shifted to the center.
+    """
+
+    """
+    Then, the frequency domain on the Cartesian grid is interpolated to a spherical one. This is the cumbersome part of 
+    the whole routine -- almost all error arises here and the invert interpolation later, and they takes most of the
+    time. The routien here is a linear interpolator, which means the sample points have to be doubled on each axis for
+    a decent accuracy. car2sph3 uses external tricubic interpolation library, and can be used without doubling the 
+    sample points, at the cost of time consumption. 
+    """
 
     # f1_sph(a_p,phi,theta,alpha,beta,gamma)
     f11_sph = car2sph(f11)
     del f11
     f12_sph = car2sph(f12)
     del f12
+    """
+    The interpolated function should have their axes in a_p, phi, theta, alpha, beta, gamma. a_p is the radius, 
+    0<=a_p<rang_ap. phi is the azimuthal angle, counting from x axis, and the n'th (0<=n<rang_phi) is at the angle
+    2*pi*n/rang_phi. theta is the zenith angle, but counting from z axis, and the n'th (0<=n<rang_theta) is at the
+    angle pi*n/(rang_theta-1).
+    For compatibity with another way to get the frequency domain in spherical grid, the SPFT package, rang_phi 
+    is restricted to multiple of 4, and rang_theta odd.
+    """
+
+    """
+    Then a integral over SO(3) is performed, to get the frequency spectrum on the SO(3) group. SO(3) is the group describing
+    the rotation of rigid body. Here SO(3) group is represented by the Euler angles triplet.
+    
+    """
 
     # f2(a_p,phi,theta,lp,mp,n)
     f21 = so3int(f11_sph)
@@ -36,23 +90,73 @@ def c3d(phi1, phi2):  # phi1(x1,x2,x3,alpha,beta,gamma):
     f22 = so3int(f12_sph)
     del f12_sph
 
+    """
+    After the SO(3) integration, the alpha, beta, gamma triplet is converted to the 'frequencies' l', m', n.
+    Now the functions should have there axes in a_p, phi, theta, lp(meaning l'), mp, and n.
+    lp should have a simple order: n'th (0<=n<rang_lp) denotes the frequency lp=n.
+    mp and n should have an order analogous to that from a FFT transform: the first several grids are positive and 
+    increasing from zero, and the second part is negative and increasing to -1, taking advantage of Python's indexing
+    convention, the negative terms are recommended to be accessed by negative indexing, so the frequency is exactly what
+    is put into the braces. The largest and smallest numbers occur at, say, for mp, mp_max and mp_min. Note mp_min < 0.
+    Similar to the rang_* expression, the *_min and *_max expressions may be made public by adding them to auxi.py.
+    Example:
+        Suppose we have mp from -7 to 8, then the function is stored in this order: [0 1 2 3 4 5 6 7 8 -7 -6 -5 -4 -3 -2
+        -1]. And in this case, mp_min = -7, mp_max = 8, rang_mp = mp_max-mp_min+1 = 16
+    From the nature of the transformation, |mp|, |n| <= lp. However, since an array with variable length of axis is not
+    handy in Python, the actual storage covers all the values within the range and zeros are assigned for the invalid
+    values. Similar henceforth.
+    One more word: since n and mp here are directly acquired by FFT, they are expected to have the same length as alpha
+    and gamma.
+    """
+
+    """
+    Then we need to integrate the function over a unit sphere, to get a 'rotation' spectrum for the frequency domain.
+    This unit sphere is defined by the theta and phi axes of the function.
+    """
+
     # f_hat(a_p,m,lp,mp,s,l)
     f_hat1 = usphint(f21)
     del f21
     f_hat2 = usphint(f22)
     del f22
+    """
+    Now we have the matrix elements of 'frequencies' of the original input function. m, s, l emerges from this procedure,
+    and the function here is expected to have axes in a_p, m, lp, mp, s, l. The indices m and s have the both negative
+    and positive values whereas l only has nonnegative ones. The transformation requires |m|, |s| < l and the convention
+    mentioned above is used.
+    """
 
+    """
+    Then it is the time to perform the convolution theorem. By matrix multiplication, we get the matrix of 'frequencies'
+    of the convolved function. Note the order of the multiplication matters.
+    """
     f_hat = mltp(f_hat1, f_hat2)
     del f_hat1, f_hat2
 
     # f = inv_int(f_hat)
     #
+    """
+    Then we are going to recover the function by a inverse transform. please look at the comments behind call to each 
+    subroutine below for the order of axes.
+    """
+    """
+    This is the integration for inverse transformation
+    """
     g1 = usphinti(f_hat)  # g1(a_p,theta,phi,lp,mp,s,n)
 
+    """
+    Then a interpolation from spherical frame to a Cartesian one
+    """
     g2 = sph2cart(g1)  # g2(p1,p2,p3,lp,mp,s,n)
 
+    """
+    Plain FFT
+    """
     g3 = e_ifft3(g2)  # g3(x1,x2,x3,lp,mp,s,n)
 
+    """
+    A integration on the SO(3) group for the inverse transform gives the final answer.
+    """
     f = so3inti(g3)
 
     return f

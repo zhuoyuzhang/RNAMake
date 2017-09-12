@@ -8,6 +8,12 @@ import warnings
 
 warnings.filterwarnings("error", module='basis')
 
+"""
+This is the subroutine to calculate the basis function. It has problem on numerical stability, since those factorial and
+exponential will throw nan and inf for large enough indices. For real application, please rewrite the basis a little to
+get a stable one.
+"""
+
 
 def p_lmn(l,mm,nn,z):
     m=np.copy(mm).astype('float32')

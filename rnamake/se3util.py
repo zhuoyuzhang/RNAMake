@@ -1,3 +1,8 @@
+# coding=UTF-8
+
+"""
+These are utilities to deal with the SE(3) group, the group to describe rigid body motion.
+"""
 import numpy as np
 
 from rnamake import base, option, motif_state_ensemble_tree
@@ -14,7 +19,7 @@ from numba import jit
 class SE3Map(object):
     """
     A map in SE(3) with all the information specified
-    :param grid_size: How many grid along each axis
+    :param grid_size: How many grid along each axis x, alpha, beta, gamma
     :param grid_unit: How long is one grid
     :param data: numpy array actually storing the data
     :type grid_sizes: iterable of int,length 4
@@ -25,7 +30,7 @@ class SE3Map(object):
         self.grid_sizes = grid_sizes
         self.grid_unit = grid_unit
         self.data = np.zeros([grid_sizes[0], grid_sizes[0], grid_sizes[0],
-                              grid_sizes[1], grid_sizes[2], grid_sizes[3]])
+                              grid_sizes[1], grid_sizes[2], grid_sizes[3]], dtype='float32')
         org = (self.grid_sizes[0] - 1) / 2
         auxi.org = [org,org,org]
         self.gen_be_weight()
@@ -41,8 +46,12 @@ class SE3Map(object):
         assert self.grid_sizes == other.grid_sizes\
             and self.grid_unit == other.grid_unit
         res = SE3Map(self.grid_sizes, self.grid_unit)
+        n1 = self.nmlz_fast(self.data)
+        n2 = self.nmlz_fast(other.data)
+        nc = n1 * n2
         res.data = fconv3d.fconv3d.c3d(self.data, other.data)
-        res.data /= self.nmlz()
+        nr = self.nmlz_fast(res.data)
+        res.data *= nc / nr
         res.data[res.data<0]=0
         res.data[np.isclose(res.data,0)] = 0
         assert not np.all(res.data == 0) # There should still be some data
@@ -75,7 +84,7 @@ class SE3Map(object):
         for mem in mse.members:
             probability = float(mem.count)/netc
             self.place_motif_state(mem.motif_state,probability)
-        ev.envis6d(self.data)
+        # ev.envis6d(self.data)
         return self
 
     #finished
@@ -193,8 +202,13 @@ class SE3Map(object):
             data * self.bwt[np.newaxis, np.newaxis, np.newaxis, np.newaxis, :, np.newaxis]) * self.grid_unit ** 3
 
 
-
-class MotifGaussianList(object): # finished
+class MotifGaussianList(object):
+    """
+    This is a list of Gaussians constructed from a MotifStateTree, each Gaussian describing the property of one node in
+     the tree, namely an ensemble of motif states of one motif step in the RNA.
+    :param mset: the MotifStateEnsembleTree from which the list is constructed.
+    :param mgl: the list of MotifGaussian objects.
+    """
     __slots__ = ['mset', 'mgl']
 
 
@@ -212,41 +226,73 @@ class MotifGaussianList(object): # finished
         """
         self.mgl=[]
         for en in mset:
-            states = np.zeros([4,4,len(en.data.members)])
-            counts = np.zeros(len(en.data.members))
+            states = np.zeros([4, 4, len(en.data.members)])  # initialize an array to hold the state matrices of the
+            # members
+            counts = np.zeros(len(en.data.members))  # initialize an array to hold the counts of occurence in the
+            # database of the members
             for i,msm in enumerate(en.data.members):
-                final_state= state_to_matrix(msm.motif_state.end_states[1])
-                start_state= state_to_matrix(msm.motif_state.end_states[0])
-                states[:,:,i] = np.dot(la.inv(start_state),final_state)
+                final_state = state_to_matrix(msm.motif_state.end_states[1])  # convert the end[1] state to matrix and
+                # append it in the array
+                start_state = state_to_matrix(msm.motif_state.end_states[0])  # convert the end[0] state to matrix and
+                # append it in the array
+                states[:, :, i] = np.dot(la.inv(start_state),
+                                         final_state)  # get the state matrix from end[0] to end[1].
+                # This should be approximately end[1]
                 counts[i] = msm.count
+                # append the count to the array
             # print en.index,'\t',np.sum(counts)
-            self.mgl.append(self.mg_from_sc(states,counts))
+            self.mgl.append(self.mg_from_sc(states, counts))  # get the MotifGaussian from the state matrix and count
+            # and append it to the array.
 
 
     def mg_from_sc(self, st, ct):
+        """
+        construct a MotifGaussian object from an array of state matrice and one of counts of occurence
+        :param st:  the array holding state matrice
+        :param ct:  the array holding counts
+        :return: MotifGaussain from above
+        """
         # print ct
         assert type(st) == np.ndarray \
                and st.shape[:2] ==(4,4)  \
                and ct.ndim == 1
+        # check dimensions
         mean = np.average(st, axis=2,weights=ct)
-        # mean = st[:,:,0]
+        # Since we assume that the MotifGaussian is 'tight' around the mean, just arithmetic mean of the matrice will
+        # give the mean.
         mean[:3,:3] /= (la.det(mean[:3,:3])**(1.0/3))
+        # Normalize the mean, to keep the rotational part of the matrix unitary.
         covar = np.cov(matrix_to_chi(st-mean[:,:,np.newaxis]), fweights=ct)
+        # Get the (unbiased) covariance from the chi extracted from the matrices
         if not np.all(np.isfinite(covar)):
             assert np.all(np.isnan(covar))
+            # in case some NaN is thrown by np.cov
         return MotifGaussian(covar,mean)
 
-
+    @jit
     def get_mg(self,ni1, ni2):
+        """
+        Get the resultant MotifGaussian of a segment of the MotifGaussianList.
+        :param ni1: the first index to count, inclusive
+        :param ni2: the last index to count, inclusive
+        :return:
+        """
         res_mg = copy.copy(self.mgl[ni1])
+        # get the first MotifGaussian
         for i in range(ni1+1,ni2+1):
             res_mg = res_mg*self.mgl[i]
+            # The '*' is overloaded as the convolution between two Gaussians. You can consider it as concatenating the
+            # right one on the left one.
             # print '|SIGMA| at the end of step %d = '%i,la.det(res_mg.SIGMA)
         return res_mg
 
 
-
-class MotifGaussian(object): # finished
+class MotifGaussian(object):
+    """
+    A Gaussian defined on the SE(3) group.
+    :param SIGMA: the convariance matrix
+    :param mean: the mean state matrix
+    """
     __slots__ = ['SIGMA','mean']
 
     def __init__(self,SIGMA,mean):
@@ -259,26 +305,37 @@ class MotifGaussian(object): # finished
         print 'MotifGaussian copied'
         return MotifGaussian(self.SIGMA,self.mean)
 
+    @jit
     def __mul__(self,other):
         """
+        '*' operator overloaded to represent the convolution between two gaussians
         :type other: MotifGaussian
         :param other:
         :return:
         """
         assert self.mean.shape ==(4,4)
+        # check dimension
         res_mean = np.dot(self.mean,other.mean)
+        # the result mean matrix is directly calculated from the product of two matrices
         g2_inv = la.inv(other.mean)
         r = g2_inv[:3,:3]
         d = g2_inv[:3, 3]
         ad = np.zeros([6,6])
+        # This is the adjoint matrix
         ad[:3,:3] = r
         ad[3:,3:] = r
         ad[3:,:3] = np.cross(d,r,axisb=0)
         res_cov = np.dot(np.dot(ad,self.SIGMA),ad.T)+other.SIGMA
+        # The covariance matrix is acquired by the formula above
         return MotifGaussian(res_cov,res_mean)
 
 
     def eval(self,chi):
+        """
+        To evaluate the value of Gaussain at a certain chi
+        :param chi:
+        :return:
+        """
         assert type(chi) == np.ndarray\
             and chi.shape == (6,)
         chi = chi.astype('float')
@@ -286,7 +343,17 @@ class MotifGaussian(object): # finished
         return 1.0/((2*np.pi)**3*np.sqrt(la.det(self.SIGMA)))*\
                np.exp(-1.0/2*np.dot(np.dot(chi.T,la.inv(self.SIGMA)),chi))#[0,0]
 
+    @jit
     def eval_double(self,chi,TAU):
+        """
+        To acquire the probability of a restricted area in the chi space, instead of integration, which is cumbersome,
+        another Gaussian can be used as a window, and the integral of the product of two Gaussians can be computed
+        analytically, very fast.
+        :param chi: The chi around which to calculate the probability
+        :param TAU: The correlation matrix of chi of the window Gaussian. Correlation matrix is the inverse of
+        covariance matrix
+        :return: The probability
+        """
         assert type(chi) == np.ndarray\
         and chi.shape == (6,)\
         and type(TAU) == np.ndarray\
@@ -298,8 +365,7 @@ class MotifGaussian(object): # finished
                                                                                        la.inv(A+TAU)),np.dot(TAU,chi))))
 
 
-
-
+# useless
 def nrg_to_probability(energy):
     """
     conversion from energy to  probability density
@@ -318,6 +384,8 @@ def nrg_to_probability(energy):
 
     return np.exp(energy/(-kBT))
 
+
+# useless
 def prob_to_nrg(prob):
     kB = 1.3806488e-1  # Boltzmann constant in pN.A/K
     kBT = kB * 298.15  # kB.T at room temperature (25 degree Celsius)
@@ -326,6 +394,11 @@ def prob_to_nrg(prob):
 
 
 def matrix_to_chi(t):
+    """
+    Convert the difference of a state matrix with mean, to the chi vector.
+    :param t: the difference of a state matrix with mean state matrix
+    :return: chi vector
+    """
     chi1 = (t[2, 1] - t[1, 2]) / 2
     chi2 = (t[0, 2] - t[2, 0]) / 2
     chi3 = (t[1, 0] - t[0, 1]) / 2
@@ -335,6 +408,7 @@ def matrix_to_chi(t):
 
 def state_to_matrix(bs):
     """
+    convert a BasepairState to state matrix
     :type bs: basepair.BasepairState
     :param bs:
     :return:
@@ -346,7 +420,10 @@ def state_to_matrix(bs):
     res[3,3] = 1
     return res
 
+
+# useless
 def test_mul():
+    # testing which multiply rule applies to the basepair states
     from rnamake import unittests
     from rnamake.unittests import instances as inst
     motif1 = inst.motif()

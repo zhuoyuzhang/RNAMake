@@ -565,11 +565,11 @@ class BuildSqliteLibraries(object):
             mes_data.append([me.to_str(), me.id, count])
         f.close()
 
-        path = settings.RESOURCES_PATH +"/motif_libraries_new/unique_twoway.db"
-        sqlite_library.build_sqlite_library(path, data, keys, 'id')
+        # path = settings.RESOURCES_PATH +"/motif_libraries_new/unique_twoway.db"
+        # sqlite_library.build_sqlite_library(path, data, keys, 'id')
 
-        # path = settings.RESOURCES_PATH +"/motif_ensemble_libraries/twoway_clusters.db"
-        # sqlite_library.build_sqlite_library(path, mes_data, mes_keys, 'id')
+        path = settings.RESOURCES_PATH + "/motif_ensemble_libraries/twoway_clusters.db"
+        sqlite_library.build_sqlite_library(path, mes_data, mes_keys, 'id')
 
     def build_ss_and_seq_libraries(self):
         libnames = ["twoway", "tcontact", "hairpin", "nway"]
@@ -687,17 +687,18 @@ class BuildSqliteLibraries(object):
             path = settings.RESOURCES_PATH + "/motif_state_libraries/" + libname + "_min.db"
             sqlite_library.build_sqlite_library(path, data, keys, 'id')
 
-# setup_start_motif()
+
+setup_start_motif()
 builder = BuildSqliteLibraries()
 
 builder.build_ideal_helices_old()
 # builder.build_trimmed_ideal_helix_library()
-# builder.build_basic_libraries()
-# builder.build_helix_ensembles()
+builder.build_basic_libraries()
+builder.build_helix_ensembles()
 #builder.build_new_bp_steps()
-# builder.build_ss_and_seq_libraries()
-# builder.build_unique_twoway_library()
-# builder.build_motif_state_libraries()
+builder.build_ss_and_seq_libraries()
+builder.build_unique_twoway_library()
+builder.build_motif_state_libraries()
 builder.build_motif_ensemble_state_libraries()
 
 
