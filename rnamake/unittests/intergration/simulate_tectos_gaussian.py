@@ -293,54 +293,73 @@ class SimulateTectos(base.Base):
 
 
 class RunMe():
+    """
+    The object to run the calculation with only one length
+    """
     def __init__(self):
-        #
-        # self.datajoe = np.genfromtxt('/home/zhuoyu/Downloads/exhustive_helices.results',
-        #                         skip_header=1,usecols=(0,1),dtype=['S128','float'])
-        # self.data_count = self.datajoe.shape[0]
 
         self.dataexp = np.genfromtxt('/home/zhuoyu/Downloads/helical_variation.csv',skip_header=1,
                                      usecols=(0,1),dtype=['S128','float'],delimiter=',')
         self.data_count = self.dataexp.shape[0]
+        # open experimental data file
 
         self.datajoe = np.genfromtxt('/home/zhuoyu/Downloads/exhustive_helices_TU.results',skip_header=1,
                                      usecols=(0,1),dtype=['S128','float'])
         self.wtctjoe = 13060.0
+        # open MC data file
 
         self.n=self.data_count
+
         self.cmpdata = np.zeros([3,self.n])
         self.cmpdata[:] = np.nan
+        # initialize an array to hold the data to be compared
+
         self.k1 =0
+        # initialize the index of loop
+
         wtst = SimulateTectos(cseq='CTAGGATATGGGGUAGGUGCGGGAACGCACCUACCCCTAAGTCCTAG')
+        # get the wild type simulation
         self.wtprob = wtst.run()
+        # get the wild type probability
         self.wtdg = -10.583
+        # get the wild type free energy
     def ud(self,x):
         # i = np.random.randint(self.data_count)
         i = x
         cseq,dg = self.dataexp[i]
+        # get the experimental chip seq and dg
         st = SimulateTectos(cseq=str(cseq))
+        # set up the object with the chip seq to run
 
         kB = 1.3806488e-1  # Boltzmann constant in pN.A/K
         kBT = kB * 298.15  # kB.T at room temperature (25 degree Celsius)
-        # st._get_mset()
-        # mt = st.mt
-        # mt.to_pdb("test.pdb", renumber=1, close_chain=1)
+
         ndxjoe = np.where(self.datajoe['f0'] == cseq)[0]
+        # get the index of the chipseq in the array of MC data
         if len(ndxjoe) == 1:
+            # if there is exactly one matching sequence, as it should be
             probjoe = self.datajoe[ndxjoe]['f1'][0]
-        # print self.datajoe[np.where(self.datajoe['f0'] == cseq)]['f0'][0]
-        # print cseq
-        # print probjoe
+            # get the probability from the MC data
             ddgjoe  = -kBT*6.02/4.1868/100*np.log(probjoe/self.wtctjoe)
+            # get the ddg from the MC data
             dgjoe = ddgjoe + self.wtdg
+            # calculate the dg from ddg
         else:
+            # if there is multiple, or no matching sequence, there must be some problem. there then is set a
+            # placeholder of NaN to suppress plotting it
             dgjoe = np.nan
             print 'data unmatched in Joe\'s and exp'
+
         simulprob = st.run()
+        # the probability from Gaussian is got
         simulddg = -kBT*6.02/4.1868/100*np.log(simulprob/self.wtprob)
+        # the ddg is calculated from probabilty
         simuldg = simulddg+self.wtdg
+        # then the dg
         self.cmpdata[0,self.k1],self.cmpdata[1,self.k1],self.cmpdata[2,self.k1] =simuldg,dg,dgjoe
+        # append all the dg's in the array, for plotting and analysis
         self.k1 +=1
+        # increment the loop index
 
 
 class RunMeVarLen():
