@@ -363,51 +363,57 @@ class RunMe():
 
 
 class RunMeVarLen():
+    """
+    This is the class for Gaussian calculation of variable lengths of sequences
+    """
     def __init__(self):
         self.dataexp = np.genfromtxt('/home/zhuoyu/Downloads/all_lengths.csv', skip_header=1,
                                 usecols=(0, 1,2,3,4), dtype=['S128','S128','S128','S128','float'],
                                      delimiter=',')
         self.data_count = self.dataexp.shape[0]
+        # load the experimental data
 
         self.datajoe = np.genfromtxt('/home/zhuoyu/Downloads/org_wcall_results.csv', skip_header=1,
                                      usecols=(1,3,8), dtype=['S128', 'S128','float'],delimiter=',')
+        # load the MC data
         self.wtctjoe = 13060.0
+        # specify the MC count of wildtype
 
 
         self.n = self.data_count
         self.cmpdata=np.zeros([3,self.n])
         self.cmpdata[:]=np.nan
+        # initialize the array for data to be compared
         self.k1 = 0
+        # initialize the loop index
 
         wtst = SimulateTectos(cseq='CTAGGATATGGGGUAGGUGCGGGAACGCACCUACCCCTAAGTCCTAG')
         self.wtprob = wtst.run()
+        # get the wild type probability
         self.wtdg = -10.583
+        # specify the wild type dg
 
     def ud(self,x,query_flen,query_clen):
         i = x
         fseq,fss,cseq,css,dg = self.dataexp[i]
+        # get the sequences and secondary structures and dg's to be calculated
         flen = 10+(len(str(fss))-len("CUAGGAAUCUGGAAGUACCGAGGAAACUCGGUACUUCCUGUGUCCUAG"))/2
         clen = 10+(len(str(css))-len("CTAGGATATGGAAGATCCTCGGGAACGAGGATCTTCCTAAGTCCTAG"))/2
+        # get the flow piece and chip piece lengths
         if flen != query_flen or clen != query_clen:
+            # if the flow piece and chip piece lengths are not the length to be queried this time, just skip.
+            # TODO this kind of filtering flow piece and chip piece lengths is inefficient, and may cause problem
+            # when the dataset is huge (although unlikely, since the dataset is generated from experiment, and
+            # experiment should be much slower than computer)
             self.fin = 0
+            # set the finished flag to 0(no calculation run this time)
             return
-        # else:
-        #     self.cmpdata[0, self.k1], self.cmpdata[1, self.k1], self.cmpdata[2, self.k1] = i-1,i,i+1
-        #     self.k1 += 1
-        #     return
         st = SimulateTectos(fseq=str(fseq),fss=str(fss),cseq=str(cseq),css=str(css))
         kB = 1.3806488e-1  # Boltzmann constant in pN.A/K
         kBT = kB * 298.15  # kB.T at room temperature (25 degree Celsius)
-        # st._get_mset()
-        # mt = st.mt
-        # mt.to_pdb("test.pdb", renumber=1, close_chain=1)
         ndxjoe = np.where(np.logical_and(self.datajoe['f0'] == fseq,self.datajoe['f1']==cseq))[0]
         if len(ndxjoe) == 1:
             ddgjoe = self.datajoe[ndxjoe]['f2'][0]
-            # print self.datajoe[np.where(self.datajoe['f0'] == cseq)]['f0'][0]
-            # print cseq
-            # print probjoe
-            # ddgjoe = -kBT * 6.02 / 4.1868 / 100 * np.log(probjoe / self.wtctjoe)
             dgjoe = ddgjoe + self.wtdg
         else:
             dgjoe = np.nan
