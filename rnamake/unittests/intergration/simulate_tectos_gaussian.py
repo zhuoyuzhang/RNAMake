@@ -32,7 +32,6 @@ class SimulateTectos(base.Base):
         options = { 'fseq'   : 'CTAGGAATCTGGAAGTACCGAGGAAACTCGGTACTTCCTGTGTCCTAG',
                     'fss'    : '((((((....((((((((((((....))))))))))))....))))))',
                     'cseq'   : 'CTAGGATATGGAAGATCCTCGGGAACGAGGATCTTCCTAAGTCCTAG',
-                    # 'cseq'   : cseq,
                     'css'    : '(((((((..((((((((((((....))))))))))))...)))))))'}
         self.options = option.Options(options)
 
@@ -409,10 +408,13 @@ class RunMeVarLen():
             # set the finished flag to 0(no calculation run this time)
             return
         st = SimulateTectos(fseq=str(fseq),fss=str(fss),cseq=str(cseq),css=str(css))
+        # construct the simulation object
         kB = 1.3806488e-1  # Boltzmann constant in pN.A/K
         kBT = kB * 298.15  # kB.T at room temperature (25 degree Celsius)
         ndxjoe = np.where(np.logical_and(self.datajoe['f0'] == fseq,self.datajoe['f1']==cseq))[0]
+        # query the index of the sequence in MC data
         if len(ndxjoe) == 1:
+            # There should be exactly 1 data matching
             ddgjoe = self.datajoe[ndxjoe]['f2'][0]
             dgjoe = ddgjoe + self.wtdg
         else:
@@ -421,68 +423,75 @@ class RunMeVarLen():
         simulprob = st.run()
         simulddg = -kBT * 6.02 / 4.1868 / 100 * np.log(simulprob / self.wtprob)
         simuldg = simulddg + self.wtdg
+        # get the Gaussain dg
         self.cmpdata[0, self.k1], self.cmpdata[1, self.k1], self.cmpdata[2, self.k1] = simuldg, dg, dgjoe
+        # append the Gaussian, experimental, MC dg to the array
         self.k1 += 1
+        # increment loop index
         self.fin = 1
+        # set finish flag to 1
+
 
 
 
 
 
 if __name__ == "__main__":
-    # args = parse_args()
-    # opts = vars(args)
     runme = RunMeVarLen()
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # lenlist = [(10,11),(9,10)]
+    # if to run under the single length dataset, alter this to RunMe() and modify accordingly the content below
     lenlist = [(10,9),(10,10),(10,11),(11,9),(11,10),(9,9),(9,10)]
-    # colorlist = cm.rainbow(np.mgrid[0:1:2*len(lenlist)*1j])
+    # list of lengths to run
     colorlist = cm.rainbow(np.mgrid[0:1:len(lenlist) * 1j])
+    # colors for different lengths
     sctlist_mine = []
+    # list of scatter plots of Gaussian
     sctlist_joe =[]
+    # list of scatter plots of MC
     len_split = []
-    # for ndx_len in enumerate(lenlist):
+    # list of indices splitting data for different length, or the indices starting data for each length.
+    # For example, in cmpdata, indices 0 thru 9 stores length (10,9), the first element in the list would be 0 , and
+    # the second 10.
+    # initialize the plots
     fig1, ax1 = plt.subplots()
     fig2, ax2 = plt.subplots()
 
     for i, ndx_len in enumerate(lenlist):
         len_split.append(runme.k1)
         k2 = runme.k1
+        # k2 is for selectively plotting data of a certain length
         runme.cmpdata[:] = np.nan
         for x in range(runme.n):
             runme.ud(x, *ndx_len)
             if runme.fin == 1:
                 break
         sct_mine = ax1.scatter(runme.cmpdata[1, k2:], runme.cmpdata[0, k2:], color=colorlist[i])
-        # sct_joe=plt.scatter(runme.cmpdata[1, k2:], runme.cmpdata[2, k2:], marker='^',color=colorlist[i+len(lenlist)])
+        # make the Gaussian plot
         sct_joe = ax2.scatter(runme.cmpdata[1, k2:], runme.cmpdata[2, k2:], marker='^', color=colorlist[i])
+        # make the plot of MC data for comparison
         sctlist_mine.append(sct_mine)
         sctlist_joe.append(sct_joe)
-    # for x in range(runme.n):
-    #     runme.ud(x)
-    # npzf = np.load('gaussian_1010.npz')
-    # runme.cmpdata = npzf['data']
-    # sct_mine= plt.scatter(runme.cmpdata[1, :], runme.cmpdata[0, :])
+
     ax1.plot(np.mgrid[-11:-7:100j], np.mgrid[-11:-7:100j], 'k')
-    # plt.figure()
-    # sct_joe=plt.scatter(runme.cmpdata[1, :], runme.cmpdata[2, :], marker='^')
-    # np.savez('gaussian_1010',data=runme.cmpdata)
+    # plot the reference line of y=x
+
     legend1 = ax2.legend(tuple(sctlist_joe), ('flow %d chip %d' % x for x in lenlist), loc='lower right',
                          scatterpoints=1, title='MC')
     legend2 = ax1.legend(tuple(sctlist_mine), ('flow %d chip %d' % x for x in lenlist), scatterpoints=1,
                          loc='upper left', title='Gaussian')
+    # add the legends
+
     legend1.draggable()
     legend2.draggable()
-    # plt.gca().add_artist(legend1)
+    # let the legends float
+
     ax2.plot(np.mgrid[-11:-7:100j], np.mgrid[-11:-7:100j], 'k')
+    # Ah, another reference line
+
     ax1.set_xlabel('Exp $\Delta G$(kcal/mol)')
     ax2.set_xlabel('Exp $\Delta G$(kcal/mol)')
     ax1.set_ylabel('Predicted $\Delta G$(kcal/mol)')
     ax2.set_ylabel('Predicted $\Delta G$(kcal/mol)')
+    # Set the labels
+
     plt.show()
-
-
-
-
-
+    # Launch the plot.
